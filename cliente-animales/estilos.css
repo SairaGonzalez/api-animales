@@ -1,0 +1,131 @@
+/* Font */
+@import url("https://fonts.googleapis.com/css2?family=Manjari:wght@100;400;700&display=swap");
+
+/* Paleta de colores */
+:root {
+  --color-oscuro: #252323;
+  --color-azul: #70798c;
+  --color-fondo: #f5f1ed;
+  --color-beige: #dad2bc;
+  --color-marron: #a99985;
+}
+
+/* Estilos generales */
+body {
+  background-color: var(--color-fondo);
+  color: var(--color-oscuro);
+  font-family: "Manjari", Helvetica, Arial, sans-serif;
+}
+
+/* Encabezado */
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  background-color: var(--color-oscuro);
+  color: var(--color-fondo);
+  margin-bottom: 24px;
+}
+
+.logo {
+  width: 85px;
+  height: 85px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.texto-encabezado h1 {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.texto-encabezado p {
+  margin: 0;
+  color: var(--color-beige);
+}
+
+/* Tarjetas */
+.card {
+  border-color: var(--color-beige);
+}
+
+.card-header {
+  background-color: var(--color-beige);
+  color: var(--color-oscuro);
+}
+
+/* Botones */
+.btn-primary {
+  background-color: var(--color-azul);
+  border-color: var(--color-azul);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-oscuro);
+  border-color: var(--color-oscuro);
+}
+
+.btn-warning {
+  background-color: var(--color-marron);
+  border-color: var(--color-marron);
+  color: var(--color-oscuro);
+}
+
+/* Tabla */
+.table thead th {
+  background-color: var(--color-azul);
+  color: white;
+}
+
+.table tbody tr:hover > * {
+  background-color: var(--color-beige);
+}
+
+/* Ajustes de pantallas */
+@media (max-width: 576px) {
+  .encabezado {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .logo {
+    width: 60px;
+    height: 60px;
+  }
+
+  .texto-encabezado h1 {
+    font-size: 1.4rem;
+  }
+}
+
+/* Contenido centrado en las celdas */
+.table th,
+.table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+#tablaAnimales td:last-child {
+  white-space: nowrap;
+}
+
+#tablaAnimales td:last-child .btn {
+  margin-bottom: 4px;
+}
+
+/* Ancho mínimo de la tabla */
+.table-responsive table {
+  min-width: 700px;
+}
+
+@media (max-width: 576px) {
+  .table-responsive table {
+    min-width: 700px;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
