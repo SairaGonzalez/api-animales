@@ -18,7 +18,7 @@ app.use(express.json());
 
 // CREAR BASE DE DATOS
 // Función para crear o abrir la base de datos
-function crearBaseDatos() {
+function crearBaseDatos(iniciarServidor) {
   console.log("Creando base de datos");
 
   // Crear o abrir la base de datos
@@ -77,12 +77,30 @@ function crearBaseDatos() {
 
                   // Mostrar mensaje de confirmación
                   console.log("Registros agregados");
+
+                  // Cerrar la base de datos
+                  cerrarBaseDatos();
                 },
               );
+            } else {
+              // Si ya están los registros, no se vuelven a insertar
+              cerrarBaseDatos();
             }
 
-            // Cerrar la conexión con la base de datos
-            db.close();
+            // Cerrar la conexión inicial y continuar el servidor
+            function cerrarBaseDatos() {
+              db.close((error) => {
+                if (error) {
+                  console.error("Error al cerrar la base de datos", error);
+                  return;
+                }
+
+                console.log("Iniciación finalizada");
+
+                // Iniciar el servidor después de preparar la base de datos
+                iniciarServidor();
+              });
+            }
           },
         );
       },
@@ -90,69 +108,96 @@ function crearBaseDatos() {
   });
 }
 
-// Ejecutar la función
-crearBaseDatos();
+// Validar datos
+function validarAnimal(datos) {
+  const { nombre, nombreCientifico, region, tipo } = datos;
+
+  return (
+    typeof nombre === "string" &&
+    typeof nombreCientifico === "string" &&
+    typeof region === "string" &&
+    typeof tipo === "string" &&
+    nombre.trim() !== "" &&
+    nombreCientifico.trim() !== "" &&
+    region.trim() !== "" &&
+    tipo.trim() !== ""
+  );
+}
 
 // SERVICIO READ
 app.get("/animales", (solicitud, respuesta) => {
   // Abrir la base de datos
-  const db = new sqlite3.Database("./animales.db");
-
-  // Obtener todos los registros de la tabla
-  db.all("SELECT * FROM animal", (error, filas) => {
+  const db = new sqlite3.Database("./animales.db", (error) => {
     if (error) {
-      respuesta.status(500).json({
-        mensaje: "No se obtuvieron los animales",
-      });
-
-      db.close();
-      return;
+      return respuesta
+        .status(500)
+        .json({ mensaje: "No se pudo abrir la base de datos" });
     }
 
-    // Enviar los datos en formato JSON
-    respuesta.json(filas);
+    // Obtener todos los registros de la tabla
+    db.all("SELECT * FROM animal", (error, filas) => {
+      if (error) {
+        db.close();
+        return respuesta
+          .status(500)
+          .json({ mensaje: "No se obtuvieron los animales" });
+      }
 
-    // Cerrar la conexión con la base de datos
-    db.close();
+      // Devolver los registros en formato JSON
+      respuesta.json(filas);
+
+      // Cerrar la conexión al completar la consulta
+      db.close();
+    });
   });
 });
 
 // SERVICIO CREATE
 app.post("/animales", (solicitud, respuesta) => {
   // Obtener los datos enviados
-  const { nombre, nombreCientifico, region, tipo } = solicitud.body;
+  const { nombre, nombreCientifico, region, tipo } = solicitud.body || {};
+
+  // Verificar si los daatos son válidos
+  if (!validarAnimal({ nombre, nombreCientifico, region, tipo })) {
+    return respuesta
+      .status(400)
+      .json({ mensaje: "Todos los campos son obligatorios" });
+  }
 
   // Abrir la base de datos
-  const db = new sqlite3.Database("./animales.db");
+  const db = new sqlite3.Database("./animales.db", (error) => {
+    if (error) {
+      return respuesta
+        .status(500)
+        .json({ mensaje: "No se pudo abrir la base de datos" });
+    }
 
-  // Insertar nuevo registro
-  db.run(
-    `
+    // Insertar nuevo registro
+    db.run(
+      `
             INSERT INTO animal
             (nombre, nombreCientifico, region, tipo)
             VALUES (?, ?, ?, ?)
             `,
-    [nombre, nombreCientifico, region, tipo],
-    function (error) {
-      if (error) {
-        respuesta.status(500).json({
-          mensaje: "No se pudo agregar el animal",
-        });
+      [nombre.trim(), nombreCientifico.trim(), region.trim(), tipo.trim()],
+      function (error) {
+        if (error) {
+          db.close();
+          return respuesta
+            .status(500)
+            .json({ mensaje: "No se pudo agregar el animal" });
+        }
 
+        // Enviar respuesta de confirmación - Agregado
+        respuesta
+          .status(201)
+          .json({ mensaje: "Animal agregado correctamente", id: this.lastID });
+
+        // Cerrar conexión
         db.close();
-        return;
-      }
-
-      // Enviar respuesta de confirmación - Agregado
-      respuesta.json({
-        mensaje: "Animal agregado correctamente",
-        id: this.lastID,
-      });
-
-      // Cerrar conexión
-      db.close();
-    },
-  );
+      },
+    );
+  });
 });
 
 // SERVICIO UPDATE
@@ -161,15 +206,31 @@ app.put("/animales/:id", (solicitud, respuesta) => {
   // Obtener el ID de la URL
   const id = solicitud.params.id;
 
+  // Comprobar que e ID sea positivo
+  if (!/^[1-9]\d*$/.test(id)) {
+    return respuesta.status(400).json({ mensaje: "El ID debe ser positivo" });
+  }
+
   // Obtener los nuevos datos enviados
-  const { nombre, nombreCientifico, region, tipo } = solicitud.body;
+  const { nombre, nombreCientifico, region, tipo } = solicitud.body || {};
+
+  // Verificar que los campos son válidos
+  if (!validarAnimal({ nombre, nombreCientifico, region, tipo })) {
+    return respuesta
+      .status(400)
+      .json({ mensaje: "Todos los campos son obligatorios" });
+  }
 
   // Abrir la base de datos
-  const db = new sqlite3.Database("./animales.db");
-
-  // Actualizar el registro con el ID indicado
-  db.run(
-    `
+  const db = new sqlite3.Database("./animales.db", (error) => {
+    if (error) {
+      return respuesta
+        .status(500)
+        .json({ mensaje: "No se pudo abrir la base de datos" });
+    }
+    // Actualizar el registro con el ID indicado
+    db.run(
+      `
         UPDATE animal
         SET nombre = ?,
         nombreCientifico = ?,
@@ -177,26 +238,39 @@ app.put("/animales/:id", (solicitud, respuesta) => {
         tipo = ?
         WHERE id = ?
         `,
-    [nombre, nombreCientifico, region, tipo, id],
-    function (error) {
-      if (error) {
-        respuesta.status(500).json({
-          mensaje: "No se pudo actualizar el animal",
+      [
+        nombre.trim(),
+        nombreCientifico.trim(),
+        region.trim(),
+        tipo.trim(),
+        Number(id),
+      ],
+      function (error) {
+        if (error) {
+          db.close();
+          return respuesta
+            .status(500)
+            .json({ mensaje: "No se pudo actualizar el animal" });
+        }
+
+        // Comprobar si se encontró y modificó el registro
+        if (this.changes === 0) {
+          db.close();
+          return respuesta
+            .status(404)
+            .json({ mensaje: "No se encontró el animal" });
+        }
+
+        // Enviar respuesta de confirmación - Actualizado
+        respuesta.json({
+          mensaje: "Animal actualizado correctamente",
         });
 
+        // Cerrar la conexión
         db.close();
-        return;
-      }
-
-      // Enviar respuesta de confirmación - Actualizado
-      respuesta.json({
-        mensaje: "Animal actualizado correctamente",
-      });
-
-      // Cerrar la conexión
-      db.close();
-    },
-  );
+      },
+    );
+  });
 });
 
 // SERVICIO DELETE
@@ -205,22 +279,34 @@ app.delete("/animales/:id", (solicitud, respuesta) => {
   // Obtener el ID de la URL
   const id = solicitud.params.id;
 
+  // Comprobar que el ID sea positivo
+  if (!/^[1-9]\d*$/.test(id)) {
+    return respuesta.status(400).json({ mensaje: "El ID debe ser positivo" });
+  }
+
   // Abrir la base de datos
-  const db = new sqlite3.Database("./animales.db");
+  const db = new sqlite3.Database("./animales.db", (error) => {
+    if (error) {
+      return respuesta
+        .status(500)
+        .json({ mensaje: "No se pudo abrir la base de datos" });
+    }
 
-  // Eliminar el registro con el ID indicado
-  db.run(
-    "DELETE FROM animal WHERE id = ?",
-
-    [id],
-    function (error) {
+    // Eliminar el registro con el ID indicado
+    db.run("DELETE FROM animal WHERE id = ?", [Number(id)], function (error) {
       if (error) {
-        respuesta.status(500).json({
-          mensaje: "No se pudo eliminar el animal",
-        });
-
         db.close();
-        return;
+        return respuesta
+          .status(500)
+          .json({ mensaje: "No se pudo eliminar el animal" });
+      }
+
+      // Comprobar si se eliminó el registro
+      if (this.changes === 0) {
+        db.close();
+        return respuesta
+          .status(404)
+          .json({ mensaje: "No se encontró el animal" });
       }
 
       // Enviar respuesta de confirmación - Eliminado
@@ -229,12 +315,16 @@ app.delete("/animales/:id", (solicitud, respuesta) => {
       });
 
       db.close();
-    },
-  );
+    });
+  });
 });
 
 // INICIAR SERVIDOR
-// Iniciar el servidor en puerto 8080
-app.listen(8080, () => {
-  console.log("Servidor funcionando en http://localhost:8080");
-});
+function iniciarServidor() {
+  app.listen(8080, () => {
+    console.log("Servidor funcionando en http://localhost:8080");
+  });
+}
+
+// Preparar la base de datos y comenzar el servidor al estar lista
+crearBaseDatos(iniciarServidor);
